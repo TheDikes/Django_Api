@@ -183,5 +183,4 @@ CACHES = {
 CELERY_BROKER_URL = 'redis://redis:6379/0'  # Use the service name defined in docker-compose.yml
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'  # Use the same Redis service for results
 
-
 AUTH_USER_MODEL = "myaccounts.User"

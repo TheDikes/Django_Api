@@ -1,6 +1,19 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from .models import User, Photographer, Client, Staff, Bookings, BookingHistory, JobPost, JobApplication, WorkHistory
+from .models import (
+    User, 
+    Photographer, 
+    Client, 
+    Staff, 
+    Bookings, 
+    BookingHistory, 
+    JobPost, 
+    JobApplication, 
+    WorkHistory,
+    Notification,
+    Profile,
+    ProfileSwitch
+)
 from .serializers import (
     UserSerializer, 
     PhotographerSerializer, 
@@ -10,14 +23,15 @@ from .serializers import (
     BookingHistorySerializer, 
     JobPostSerializer,
     JobApplicationSerializer,
-    WorkHistorySerializer
+    WorkHistorySerializer,
+    NotificationSerializer,
+    ProfileSerializer,
+    ProfileSwitchSerializer
 )
 from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.authtoken.models import Token
 from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .utils import generate_verification_token, send_verification_email, verify_verification_token 
 
@@ -391,10 +405,9 @@ def work_history_detail(request, id):
         return Response(status=status.HTTP_204_NO_CONTENT)
     
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def switch_profile(request):
+def profile_switch(request):
     if request.method == 'POST':
         selected_profile = request.data.get('selected_profile')
         entered_email = request.data.get('email')
@@ -415,13 +428,44 @@ def switch_profile(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def notification_list(request):
+    notifications = Notification.objects.all()
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def profile_list(request):
+    profiles = Profile.objects.all()
+    serializer = ProfileSerializer(profiles, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def profile_detail(request, id):
+    profile = get_object_or_404(Profile, id=id)
+    
+    if request.method == 'GET':
+        serializer = ProfileSerializer(profile)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        # Add logic for creating work history related to this profile
+        serializer = WorkHistorySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(photographer=request.user, profile=profile)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def confirm_switch_profile(request, selected_profile, token):
     verification_result = verify_verification_token(token)
     if isinstance(verification_result, dict) and verification_result['user_id'] == request.user.id:
-        User = User.model()
-        user = User.objects.get(id=request.user.id)
-        
-        """ Switch profile logic based on the selected_profile value """
+        user = request.user
         if selected_profile == 'client':
             user.is_client = True
             user.is_photographer = False
@@ -430,8 +474,8 @@ def confirm_switch_profile(request, selected_profile, token):
             user.is_photographer = True
         else:
             return Response({'message': 'Invalid profile selection'}, status=status.HTTP_400_BAD_REQUEST)
-        
+
         user.save()
         return Response({'message': 'Profile switched successfully'}, status=status.HTTP_200_OK)
-    
+
     return Response({'message': 'Invalid verification token'}, status=status.HTTP_400_BAD_REQUEST)

@@ -1,11 +1,38 @@
 from rest_framework import serializers
-from .models import User, Staff, Photographer, Client, Bookings, BookingHistory, JobPost, JobApplication, WorkHistory
+from .models import (
+    User, 
+    Staff, 
+    Photographer, 
+    Client, 
+    Bookings, 
+    BookingHistory, 
+    JobPost, 
+    JobApplication, 
+    WorkHistory, 
+    Notification,
+    Profile, 
+    ProfileSwitch
+)
 from rest_framework.authtoken.models import Token
 
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = '__all__'
 
 class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Bookings
+        fields = '__all__'
+
+class ProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = '__all__'
+
+class ProfileSwitchSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileSwitch
         fields = '__all__'
 
 class JobPostSerializer(serializers.ModelSerializer):
@@ -47,7 +74,6 @@ class ClientSerializer(serializers.ModelSerializer):
     class Meta:
         model = Client
         fields = '__all__'
-
 
 
 class UserSerializer(serializers.ModelSerializer):

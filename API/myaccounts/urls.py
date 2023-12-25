@@ -19,7 +19,12 @@ from .views import (
     apply_for_job,
     job_application_detail,
     work_history_list,
-    work_history_detail
+    work_history_detail,
+    notification_list,
+    profile_list, 
+    profile_detail,
+    profile_switch,
+    confirm_switch_profile
 )
 
 from rest_framework_simplejwt.views import (
@@ -57,6 +62,19 @@ urlpatterns = [
     # Booking history endpoints
     path('booking-history/', booking_history_list, name='booking_history_list'),
     path('booking-history/<int:id>/', booking_history_detail, name='booking_history_detail'),
+
+    # Notification endpoints
+    path('notifications/', notification_list, name='notification-list'),
+
+    # profiles endpoints
+    path('profiles/', profile_list, name='profile-list'),
+    path('profiles/<int:id>/', profile_detail, name='profile_detail'),
+
+    # profileswitch endpoints
+    path('profile-switch/', profile_switch, name='profile-switch'),
+
+    # confirm profile switch endpoints
+    path('confirm-switch-profile/<str:selected_profile>/<str:token>/', confirm_switch_profile, name='confirm_switch_profile'),
 
     # Job Post endpoints
     path('job-post/', job_post_list, name='job_post_list'),

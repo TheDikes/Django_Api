@@ -214,6 +214,9 @@ class Notification(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     unanswered_count = models.IntegerField(default=0)
 
+    def __str__(self):
+        return f"{self.photographer.username} - {self.booking.event_date}"
+
 
 class BookingHistory(models.Model):
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='client_booking_history', null=True)

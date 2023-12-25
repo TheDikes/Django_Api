@@ -2,6 +2,9 @@
 passwords.txt
 secret_key.txt
 
+__pycache__/
+*.pyc
+
 /Django/settings.py
 /docker-compose.yml
 /data
