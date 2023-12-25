@@ -1,0 +1,8 @@
+# Ignore specific files
+passwords.txt
+secret_key.txt
+
+/API/settings.py
+/docker-compose.yml
+/data
+*.env
