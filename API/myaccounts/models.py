@@ -1,6 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils import timezone
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class CustomUserManager(BaseUserManager):
@@ -47,26 +51,34 @@ class User(AbstractUser):
     profile_switch = models.OneToOneField('myaccounts.ProfileSwitch', on_delete=models.CASCADE, null=True, blank=True, related_name='related_user')
 
     email = models.EmailField(max_length=80, unique=True)
+    username = models.CharField(max_length=45, unique=True)
     first_name = models.CharField(max_length=80)
     last_name = models.CharField(max_length=80)
-    username = models.CharField(max_length=45, unique=True)
+   
 
     date_joined = models.DateTimeField(default=timezone.now)
     last_login = models.DateTimeField(blank=True, null=True)
 
     objects = CustomUserManager()
 
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["username"]
 
     def switch_profile(self, profile_type):
-        if self.profile_switch:
-            self.profile_switch.active_profile.profile_type = profile_type
-            self.profile_switch.active_profile.save()
+        if self.user_type in [2, 3]:  # Allow switching only for photographer (2) and client (3)
+            if self.profile_switch:
+                self.profile_switch.active_profile.profile_type = profile_type
+                self.profile_switch.active_profile.save()
+            else:
+                """ Create a new profile switch entry """
+                profile = Profile.objects.create(profile_type=profile_type)
+                switch = ProfileSwitch.objects.create(user=self, active_profile=profile)
+                self.profile_switch = switch
+                self.save()
         else:
-            """ Create a new profile switch entry """
-            profile = Profile.objects.create(profile_type=profile_type)
-            switch = ProfileSwitch.objects.create(user=self, active_profile=profile)
-            self.profile_switch = switch
-            self.save()
+            logger.warning(f"Profile switching not allowed for user type {self.user_type}")
+
+
 
     def save(self, *args, **kwargs):
         created = not self.pk  # Check if instance is being created or updated
@@ -82,10 +94,8 @@ class User(AbstractUser):
             elif self.user_type == 3:  
                 Client.objects.create(user=self)
 
-    class Meta:
-        verbose_name = "User"
-        verbose_name_plural = "Users"
-
+    def __str__(self):
+        return self.username
 
 
 class Profile(models.Model):

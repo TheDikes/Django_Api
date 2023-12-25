@@ -15,8 +15,25 @@ from .serializers import (
 from rest_framework import status
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .utils import generate_verification_token, send_verification_email, verify_verification_token 
+
+
+
+# CustomToken 
+class CustomTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            refresh = response.data.get('refresh')
+            access = response.data.get('access')
+            if refresh and access:
+                response.set_cookie('refresh_token', refresh, httponly=True)
+                response.data = {'access_token': access}
+        return response
     
 
 # User Registration
@@ -39,7 +56,6 @@ def signup(request):
             'message': 'User registered successfully'
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
 
 # User Login
@@ -49,14 +65,16 @@ def login_user(request):
     email = request.data.get('email')
     password = request.data.get('password')
 
-    if email and password:
-        user = authenticate(request, email=email, password=password)
-        if user:
-            refresh = RefreshToken.for_user(user)
-            return Response({'access_token': str(refresh.access_token)}, status=status.HTTP_200_OK)
-        return Response({'message': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
-    return Response({'message': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
+    if email is None or password is None:
+        return Response({'message': 'Email and password are required'}, status=status.HTTP_400_BAD_REQUEST)
 
+    user = authenticate(request, email=email, password=password)
+
+    if user is not None:
+        refresh = RefreshToken.for_user(user)
+        return Response({'message': 'Login Successful', 'access_token': str(refresh.access_token)}, status=status.HTTP_200_OK)
+    else:
+        return Response({'message': 'Invalid email or password'}, status=status.HTTP_401_UNAUTHORIZED)
 
 
 # User Logout

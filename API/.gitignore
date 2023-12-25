@@ -2,7 +2,7 @@
 passwords.txt
 secret_key.txt
 
-/API/settings.py
+/Django/settings.py
 /docker-compose.yml
 /data
 *.env

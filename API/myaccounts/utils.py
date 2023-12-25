@@ -3,22 +3,7 @@ import jwt
 from datetime import datetime, timedelta
 from django.urls import reverse
 from django.core.mail import send_mail
-from rest_framework_simplejwt.views import TokenObtainPairView
 from django.conf import settings
-
-
-
-# CustomToken 
-class CustomTokenObtainPairView(TokenObtainPairView):
-    def post(self, request, *args, **kwargs):
-        response = super().post(request, *args, **kwargs)
-        if response.status_code == 200:
-            refresh = response.data.get('refresh')
-            access = response.data.get('access')
-            if refresh and access:
-                response.set_cookie('refresh_token', refresh, httponly=True)
-                response.data = {'access_token': access}
-        return response
 
 
 

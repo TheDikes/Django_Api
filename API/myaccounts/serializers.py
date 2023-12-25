@@ -55,16 +55,12 @@ class UserSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(max_length=80)
     username = serializers.CharField(max_length=45)
     password = serializers.CharField(min_length=8, write_only=True)
-    staff = StaffSerializer(required=False)
-    photographer = PhotographerSerializer(required=False)
-    client = ClientSerializer(required=False)
 
     class Meta:
         model = User
         fields = '__all__'
 
 
-        
     def create(self, validated_data):
         password = validated_data.pop("password")
         user=super().create(validated_data)
