@@ -56,10 +56,14 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-
-# AUTHENTICATION_BACKENDS = [
-#     'myaccounts.custom_auth_backend.EmailAuthBackend',
-# ]
+# Email configurations
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'your_email_host'
+EMAIL_PORT = 587  # Set your port number
+EMAIL_HOST_USER = 'your_email@example.com'
+EMAIL_HOST_PASSWORD = 'your_email_password'
+EMAIL_USE_TLS = True  # Or False if you're using SSL
+DEFAULT_FROM_EMAIL = 'your_email@example.com'
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=2),
