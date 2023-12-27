@@ -1,8 +1,0 @@
-FROM python:3.12.0
-ENV PYTHONUNBUFFERED 1
-WORKDIR /Django
-COPY requirements.txt /Django/requirements.txt
-RUN pip install -r requirements.txt
-COPY . /Django/
-
-CMD ["python3", "manage.py", "runserver", "0.0.0.0:8000"]
