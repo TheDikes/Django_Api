@@ -33,6 +33,7 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.pagination import PageNumberPagination
 from .utils import generate_verification_token, send_verification_email, verify_verification_token 
 
 
@@ -112,7 +113,7 @@ def get_all_users(request):
     serializer = UserSerializer(users, many=True)
     return Response(serializer.data)
 
-
+# Retrieve all photographers
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])  
 def get_all_photographers(request):
@@ -120,6 +121,7 @@ def get_all_photographers(request):
     serializer = PhotographerSerializer(photographers, many=True)
     return Response(serializer.data)
 
+# Retrieve all clients
 @api_view(['GET'])
 @permission_classes([IsAuthenticated]) 
 def get_all_clients(request):
@@ -127,12 +129,22 @@ def get_all_clients(request):
     serializer = ClientSerializer(clients, many=True)
     return Response(serializer.data)
 
+# Retrieve all staffs
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])  
 def get_all_staff(request):
     staff = Staff.objects.all()
     serializer = StaffSerializer(staff, many=True)
     return Response(serializer.data)
+
+# # Retrieve all job posts
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def all_job_posts(request):
+    job_posts = JobPost.objects.all()
+    serializer = JobPostSerializer(job_posts, many=True)
+    return Response(serializer.data)
+
 
 # Create Bookings
 @api_view(['GET', 'POST'])
@@ -144,13 +156,15 @@ def booking_list(request):
         return Response(serializer.data)
 
     elif request.method == 'POST':
-        serializer = BookingSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(client=request.user)  # Assuming the client is creating the booking
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = request.user
+        if user.user_type == 3:
+            serializer = BookingSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(client=user)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
+ 
 # Create Booking history
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
@@ -166,7 +180,7 @@ def booking_history_list(request):
             serializer.save(client=request.user)  # Assuming the client is creating the booking history
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 
 # Create Job Post
 @api_view(['GET', 'POST'])
@@ -178,11 +192,13 @@ def job_post_list(request):
         return Response(serializer.data)
 
     elif request.method == 'POST':
-        serializer = JobPostSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(client=request.user.client_profile)  # Assuming the client is creating the job post
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        user = request.user
+        if user.user_type == 3:
+            serializer = JobPostSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(client=user.client_profile)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 
 # Create Job Application
@@ -193,15 +209,16 @@ def apply_for_job(request, job_post_id):
         job_post = JobPost.objects.get(pk=job_post_id)
     except JobPost.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-
-    serializer = JobApplicationSerializer(data=request.data)
-    if serializer.is_valid():
-        # Assuming you have access to the authenticated photographer and client
-        photographer = request.user.photographer  # Get the authenticated photographer
-        client = job_post.client  # Get the client who posted the job
-        serializer.save(job_post=job_post, photographer=photographer, client=client)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    user = request.user
+    if user.user_type == 2:
+        serializer = JobApplicationSerializer(data=request.data)
+        if serializer.is_valid():
+            photographer = user.photographer_profile 
+            client = job_post.client  
+            serializer.save(job_post=job_post, photographer=photographer, client=client)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 # Create work history 
@@ -300,22 +317,27 @@ def booking_detail(request, id):
     except Bookings.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if request.method == 'GET':
-        serializer = BookingSerializer(booking)
-        return Response(serializer.data)
-    elif request.method == 'PUT':
-        serializer = BookingSerializer(booking, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
+    user = request.user
+    if user.user_type == 3:  # Allowing only clients to access this endpoint
+        if request.method == 'GET':
+            serializer = BookingSerializer(booking)
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    elif request.method == 'DELETE':
-        booking.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        elif request.method == 'PUT':
+            serializer = BookingSerializer(booking, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        elif request.method == 'DELETE':
+            booking.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+    else:
+        return Response({'message': 'Only clients can perform this action'}, status=status.HTTP_403_FORBIDDEN)
 
 
-# Retrieve, Update, Delete Booking history by ID
-@api_view(['GET', 'PUT', 'DELETE'])
+
+# Retrieve Booking history by ID
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def booking_history_detail(request, id):
     try:
@@ -323,19 +345,9 @@ def booking_history_detail(request, id):
     except BookingHistory.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if request.method == 'GET':
-        serializer = BookingHistorySerializer(booking_history)
-        return Response(serializer.data)
-    elif request.method == 'PUT':
-        serializer = BookingHistorySerializer(booking_history, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    elif request.method == 'DELETE':
-        booking_history.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    
+    serializer = BookingHistorySerializer(booking_history)
+    return Response(serializer.data)
+
 
 # Retrieve, Update, Delete Job Post by ID
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -346,20 +358,26 @@ def job_post_detail(request, id):
     except JobPost.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
-    if request.method == 'GET':
-        serializer = JobPostSerializer(job_post)
-        return Response(serializer.data)
-    elif request.method == 'PUT':
-        serializer = JobPostSerializer(job_post, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
+    user = request.user
+    if user.user_type == 3:  # Allowing only clients to access this endpoint
+        if request.method == 'GET':
+            serializer = JobPostSerializer(job_post)
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    elif request.method == 'DELETE':
-        job_post.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        elif request.method == 'PUT':
+            serializer = JobPostSerializer(job_post, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        elif request.method == 'DELETE':
+            job_post.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+    else:
+        return Response({'message': 'Only clients can perform this action'}, status=status.HTTP_403_FORBIDDEN)
+
     
 
+# Retrieve, Update, Delete Job Post by ID
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def job_application_detail(request, application_id):
@@ -368,22 +386,27 @@ def job_application_detail(request, application_id):
     except JobApplication.DoesNotExist:
         return Response({'message': 'Job application not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    if request.method == 'GET':
-        serializer = JobApplicationSerializer(job_application)
-        return Response(serializer.data)
-    elif request.method == 'PUT':
-        serializer = JobApplicationSerializer(job_application, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
+    user = request.user
+    if user.user_type == 2:  # Assuming user_type 2 is for photographers
+        if request.method == 'GET':
+            serializer = JobApplicationSerializer(job_application)
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    elif request.method == 'DELETE':
-        job_application.delete()
-        return Response({'message': 'Job application deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+        elif request.method == 'PUT':
+            serializer = JobApplicationSerializer(job_application, data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        elif request.method == 'DELETE':
+            job_application.delete()
+            return Response({'message': 'Job application deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+    else:
+        return Response({'message': 'Access denied. Only photographers can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
 
 
-# Retrieve, Update, Delete Work history by ID
-@api_view(['GET', 'PUT', 'DELETE'])
+
+# Retrieve Work history by ID
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def work_history_detail(request, id):
     try:
@@ -391,75 +414,79 @@ def work_history_detail(request, id):
     except WorkHistory.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
+    serializer = WorkHistorySerializer(work_history)
+    return Response(serializer.data)
+
+
+#Notification
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def notification_list(request):
     if request.method == 'GET':
-        serializer = WorkHistorySerializer(work_history)
+        notifications = Notification.objects.all()
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data)
+
+
+#Profile
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def profile_list(request):
+    if request.method == 'GET':
+        profiles = Profile.objects.all()
+        serializer = ProfileSerializer(profiles, many=True)
+        return Response(serializer.data)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def profile_detail(request, id):
+    try:
+        profile = Profile.objects.get(pk=id)
+    except Profile.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        serializer = ProfileSerializer(profile)
         return Response(serializer.data)
     elif request.method == 'PUT':
-        serializer = WorkHistorySerializer(work_history, data=request.data)
+        serializer = ProfileSerializer(profile, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     elif request.method == 'DELETE':
-        work_history.delete()
+        profile.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
 
+
+
+ #profile switch   
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def profile_switch(request):
     if request.method == 'POST':
         selected_profile = request.data.get('selected_profile')
-        entered_email = request.data.get('email')
 
-        user = request.user
-        if user.email != entered_email:
-            return Response({'message': 'Invalid email'}, status=status.HTTP_400_BAD_REQUEST)
+        user = request.user  # Get the logged-in user
 
         try:
+            # Generate verification token and send email using the user's email
             verification_token = generate_verification_token(user, selected_profile)
             send_verification_email(user.email, selected_profile, verification_token)
-            return Response({'message': 'Verification email sent'}, status=status.HTTP_200_OK)
+
+            # Create a new profile switch entry for the user
+            profile_switch = ProfileSwitch.objects.create(user=user)
+            serializer = ProfileSwitchSerializer(profile_switch)
+
+            return Response({'message': 'Verification email sent', 'data': serializer.data}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error_message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({'message': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def notification_list(request):
-    notifications = Notification.objects.all()
-    serializer = NotificationSerializer(notifications, many=True)
-    return Response(serializer.data)
 
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def profile_list(request):
-    profiles = Profile.objects.all()
-    serializer = ProfileSerializer(profiles, many=True)
-    return Response(serializer.data)
-
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def profile_detail(request, id):
-    profile = get_object_or_404(Profile, id=id)
-    
-    if request.method == 'GET':
-        serializer = ProfileSerializer(profile)
-        return Response(serializer.data)
-    
-    elif request.method == 'POST':
-        # Add logic for creating work history related to this profile
-        serializer = WorkHistorySerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(photographer=request.user, profile=profile)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
+#confirming profile switch 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def confirm_switch_profile(request, selected_profile, token):

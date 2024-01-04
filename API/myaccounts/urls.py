@@ -4,6 +4,7 @@ from .views import (
     login_user,  
     logout_user,
     get_all_users,
+    all_job_posts,
     get_all_photographers,
     get_all_clients,
     get_all_staff,
@@ -54,6 +55,7 @@ urlpatterns = [
     path('photographers/', get_all_photographers, name='get_all_photographers'),
     path('clients/', get_all_clients, name='get_all_clients'),
     path('staff/', get_all_staff, name='get_all_staff'),
+     path('job-posts/', all_job_posts, name='all_job_posts'),
 
     # Booking-related endpoints
     path('bookings/', booking_list, name='booking_list'),

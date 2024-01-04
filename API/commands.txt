@@ -19,6 +19,4 @@ docker compose exec web python manage.py makemigrations # or run directly
 docker compose exec web python manage.py migrate
 
 
-
-
 celery -A your_project_name worker -l info

@@ -13,11 +13,12 @@ def send_verification_email(email, selected_profile, token):
     """
     verification_url = reverse('confirm_switch_profile', args=[selected_profile, token])
     subject = 'Confirmation for Profile Switch'
-    message = f'Hi there!
+    message = f'''Hi there!
     \n\nPlease confirm your switch to the {selected_profile} profile by clicking the following link:
     \n\n{verification_url}\n\nThis link will expire after a certain duration for security purposes. 
     If you did not initiate this request, please ignore this email.
-    \n\nBest regards,\nPictoria Photography Team'
+    \n\nBest regards,\nPictoria Photography Team'''
+
 
     try:
         send_mail(
@@ -47,4 +48,4 @@ def verify_verification_token(token):
     except jwt.ExpiredSignatureError:
         return 'Token expired'
     except jwt.InvalidTokenError:
-        return 'Invalid token'
+        return 'Invalid token' 
