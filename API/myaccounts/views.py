@@ -35,6 +35,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
 from .utils import generate_verification_token, send_verification_email, verify_verification_token 
+from .signals import send_notification_to_photographer, create_booking_timer, create_user_profile
 
 
 
@@ -459,50 +460,62 @@ def profile_detail(request, id):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-
- #profile switch   
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def profile_switch(request):
     if request.method == 'POST':
         selected_profile = request.data.get('selected_profile')
-
-        user = request.user  # Get the logged-in user
+        user = request.user
 
         try:
-            # Generate verification token and send email using the user's email
+            """ Generate verification token and send email using the user's email """
             verification_token = generate_verification_token(user, selected_profile)
             send_verification_email(user.email, selected_profile, verification_token)
 
-            # Create a new profile switch entry for the user
-            profile_switch = ProfileSwitch.objects.create(user=user)
-            serializer = ProfileSwitchSerializer(profile_switch)
+            """ Update the ProfileSwitch model to indicate the verification email has been sent 
+                Store the verification token in ProfileSwitch model for future confirmation
+            """
+            profile_switch, created = ProfileSwitch.objects.get_or_create(user=user)
+            profile_switch.email_validation_token = verification_token
+            profile_switch.save()
 
-            return Response({'message': 'Verification email sent', 'data': serializer.data}, status=status.HTTP_200_OK)
+            return Response({'message': 'Verification email sent'}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error_message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
     return Response({'message': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
-
-#confirming profile switch 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def confirm_switch_profile(request, selected_profile, token):
-    verification_result = verify_verification_token(token)
-    if isinstance(verification_result, dict) and verification_result['user_id'] == request.user.id:
-        user = request.user
-        if selected_profile == 'client':
-            user.is_client = True
-            user.is_photographer = False
-        elif selected_profile == 'photographer':
-            user.is_client = False
-            user.is_photographer = True
-        else:
-            return Response({'message': 'Invalid profile selection'}, status=status.HTTP_400_BAD_REQUEST)
+    verification_token = token
+    user = request.user
 
-        user.save()
-        return Response({'message': 'Profile switched successfully'}, status=status.HTTP_200_OK)
+    """Retrieve the ProfileSwitch model for the user"""
+    try:
+        profile_switch = ProfileSwitch.objects.get(user=user)
+    except ProfileSwitch.DoesNotExist:
+        return Response({'message': 'Profile switch not initiated'}, status=status.HTTP_400_BAD_REQUEST)
 
-    return Response({'message': 'Invalid verification token'}, status=status.HTTP_400_BAD_REQUEST)
+    """Verify the token against the stored email validation token """
+    if verification_token == profile_switch.email_validation_token:
+        
+        """ Perform the profile switch once the token is validated """
+        try:
+            profile = user.profile
+            if selected_profile == 'client' or selected_profile == 'photographer':
+                profile.profile_type = selected_profile
+            else:
+                return Response({'message': 'Invalid profile selection'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+            profile_switch.is_verified = True
+            profile_switch.save()
+
+            profile.save()
+            return Response({'message': 'Profile switched successfully'}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error_message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        return Response({'message': 'Invalid verification token'}, status=status.HTTP_400_BAD_REQUEST)

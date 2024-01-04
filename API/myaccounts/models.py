@@ -1,10 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.utils import timezone
-import logging
-
-
-logger = logging.getLogger(__name__)
 
 
 class CustomUserManager(BaseUserManager):
@@ -48,7 +44,6 @@ class User(AbstractUser):
     )
 
     user_type = models.IntegerField(default=1, choices=USER_TYPE_CHOICES)
-    profile_switch = models.OneToOneField('myaccounts.ProfileSwitch', on_delete=models.CASCADE, null=True, blank=True, related_name='related_user')
 
     email = models.EmailField(max_length=80, unique=True)
     username = models.CharField(max_length=45, unique=True)
@@ -63,21 +58,6 @@ class User(AbstractUser):
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
-
-    def switch_profile(self, profile_type):
-        if self.user_type in [2, 3]:  # Allow switching only for photographer (2) and client (3)
-            if self.profile_switch:
-                self.profile_switch.active_profile.profile_type = profile_type
-                self.profile_switch.active_profile.save()
-            else:
-                """ Create a new profile switch entry """
-                profile = Profile.objects.create(profile_type=profile_type)
-                switch = ProfileSwitch.objects.create(user=self, active_profile=profile)
-                self.profile_switch = switch
-                self.save()
-        else:
-            logger.warning(f"Profile switching not allowed for user type {self.user_type}")
-
 
 
     def save(self, *args, **kwargs):
@@ -98,32 +78,48 @@ class User(AbstractUser):
         return self.username
 
 
+
 class Profile(models.Model):
-      PROFILE_CHOICES = (
+    PROFILE_CHOICES = (
         (1, 'Photographer'),
         (2, 'Client'),
-        )
-      profile_type = models.IntegerField(choices=PROFILE_CHOICES)
+    )
+    user = models.OneToOneField(User, on_delete=models.CASCADE, default=None)
+    profile_type = models.IntegerField(choices=PROFILE_CHOICES)
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    location = models.CharField(max_length=50, null=True)
+    image = models.ImageField(null=True, blank=True, upload_to='profile_images/')
 
-      """ Common fields for both Photographer and Client profiles """
-      phone = models.CharField(max_length=20, blank=True, null=True)
-      location = models.CharField(max_length=50, null=True)
-      image = models.ImageField(null=True, blank=True, upload_to='profile_images/')
-      
-      class Meta:
+    def __str__(self):
+        return self.user.username 
+
+    class Meta:
         verbose_name = "Profile"
-        verbose_name_plural = "Profiles"  
+        verbose_name_plural = "Profiles"
+
+        
         
 class ProfileSwitch(models.Model):
     user = models.OneToOneField('myaccounts.User', on_delete=models.CASCADE, related_name='related_profile_switch')
-    active_profile = models.ForeignKey('myaccounts.Profile', on_delete=models.CASCADE)
+    current_profile = models.ForeignKey('myaccounts.Profile', on_delete=models.CASCADE, related_name='current_profile_switch')
+    intended_profile = models.ForeignKey('myaccounts.Profile', on_delete=models.CASCADE, related_name='intended_profile_switch')
+    email_validation_token = models.CharField(max_length=100, blank=True, null=True)
+    is_validated = models.BooleanField(default=False)
+    is_verified = models.BooleanField(default=False) 
+
+
+    class Meta:
+        verbose_name = "Profile Switch"
+        verbose_name_plural = "Profile Switches"
 
 
 class Staff(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='staff')
-
     phone = models.CharField(max_length=20, blank=True, null=True)
     department = models.CharField(max_length=100, blank=True, null=True)
+
+    def __str__(self):
+        return self.user.username
 
     class Meta:
         verbose_name = "Staff"
@@ -131,7 +127,9 @@ class Staff(models.Model):
 
 
 class Photographer(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='photographer')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='photographer_profile')
+    profile = models.OneToOneField(Profile, on_delete=models.CASCADE, related_name='photographer_profile', null=True)
+    profile_switch = models.OneToOneField(ProfileSwitch, on_delete=models.CASCADE, related_name='photographer_switch', null=True, blank=True)
     age = models.PositiveIntegerField(null=True)
     bio = models.TextField(help_text="The bio of the photographer")
     portfolio = models.FileField(upload_to='photographer_portfolios/', blank=True, null=True)
@@ -140,19 +138,26 @@ class Photographer(models.Model):
     account_number = models.CharField(max_length=20, null=False)
     bank_name = models.CharField(max_length=100, null=False)
 
+    def __str__(self):
+        return self.user.username
+
     class Meta:
         verbose_name = "Photographer"
         verbose_name_plural = "Photographers"
 
 
 class Client(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='client_profile')
+    profile = models.OneToOneField(Profile, on_delete=models.CASCADE, related_name='client_profile', null=True)
+    profile_switch = models.OneToOneField(ProfileSwitch, on_delete=models.CASCADE, related_name='client_switch', null=True, blank=True)
     description = models.TextField(null=True)
+
+    def __str__(self):
+        return self.user.username 
 
     class Meta:
         verbose_name = "Client"
         verbose_name_plural = "Clients"
-
 
 
 class Bookings(models.Model):

@@ -1,8 +1,6 @@
 from celery import shared_task
 from datetime import timedelta
-from .models import Bookings
-from .models import Notification
-from .models import Photographer
+from .models import Bookings, Notification, Photographer
 
 
 def suspend_photographer(photographer_id):

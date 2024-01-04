@@ -1,22 +1,53 @@
 from django.contrib import admin
-from .models import User, Staff, Photographer, Client, Bookings, BookingHistory, JobPost, JobApplication,  WorkHistory
+from .models import User, Staff, Photographer, Client, Bookings, BookingHistory, JobPost, JobApplication, WorkHistory, Profile, ProfileSwitch
 
-admin.site.register(User)
-admin.site.register(Staff)
-admin.site.register(Photographer)
-admin.site.register(Client)
+
+@admin.register(User)
+class UserAdmin(admin.ModelAdmin):
+    readonly_fields = ('user_type',) 
+
+
+@admin.register(Photographer)
+class PhotographerAdmin(admin.ModelAdmin):
+    readonly_fields = ('user', 'profile',) 
+
+
+@admin.register(Client)
+class ClientAdmin(admin.ModelAdmin):
+    readonly_fields = ('user', 'profile',)  
+
+
+@admin.register(Staff)
+class StaffAdmin(admin.ModelAdmin):
+    readonly_fields = ('user',)  
+
+
+@admin.register(Profile)
+class ProfileAdmin(admin.ModelAdmin):
+    readonly_fields = ('user',)  
+
+
+@admin.register(ProfileSwitch)
+class ProfileSwitchAdmin(admin.ModelAdmin):
+    readonly_fields = ('user', 'current_profile',)  
 
 
 @admin.register(Bookings)
 class BookingAdmin(admin.ModelAdmin):
     list_display = ('client', 'photographer', 'event_date', 'status')
-    list_filter = ('status', 'event_date', 'client')
+    list_filter = ('status', 'event_date')
     search_fields = ('client__username', 'photographer__username', 'event_date')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'client':
-            kwargs['queryset'] = User.objects.filter(user_type=3) 
+            kwargs['queryset'] = User.objects.filter(user_type=3)  # Filters only clients for 'client' field
+
+        if db_field.name == 'photographer':
+            kwargs['queryset'] = User.objects.filter(user_type=2)  # Filters only photographers for 'photographer' field
+
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
 
 
 @admin.register(BookingHistory)
@@ -29,6 +60,8 @@ class BookingHistoryAdmin(admin.ModelAdmin):
         if db_field.name == 'client':
             kwargs['queryset'] = User.objects.filter(user_type=3) 
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+
 
 @admin.register(JobPost)
 class JobPostAdmin(admin.ModelAdmin):
@@ -40,6 +73,8 @@ class JobPostAdmin(admin.ModelAdmin):
         if db_field.name == 'client':
             kwargs['queryset'] = User.objects.filter(user_type=3)  
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+
 
 @admin.register(JobApplication)
 class JobApplicationsAdmin(admin.ModelAdmin):
@@ -52,6 +87,8 @@ class JobApplicationsAdmin(admin.ModelAdmin):
             kwargs['queryset'] = User.objects.filter(user_type=2)  
             kwargs['queryset'] = User.objects.filter(user_type=3) 
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+
 
 @admin.register(WorkHistory)
 class WorkHistoriesAdmin(admin.ModelAdmin):
